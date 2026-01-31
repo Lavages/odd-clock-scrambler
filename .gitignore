@@ -1,0 +1,3 @@
+tmp_*.png
+__pycache__/
+*.pdf
