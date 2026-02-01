@@ -149,15 +149,26 @@ class App(ctk.CTk):
         self.back.render_puzzle()
 
     def generate_scramble_set(self):
+        # 5 regular + 2 extra (E1, E2)
         return [self.generate_single_scramble() for _ in range(7)]
 
     def generate_single_scramble(self):
         if self.mode_var.get() == "Triangular":
-            m1 = ["DR", "DL", "U", "R", "D", "L", "ALL"]; m2 = ["DR", "DL", "U", "ALL"]
+            m1 = ["DR", "DL", "U", "R", "D", "L", "ALL"]
+            m2 = ["DR", "DL", "U", "ALL"]
         else:
-            m1 = ["UR", "DR", "DL", "UL", "UM", "L", "U", "R", "DRw", "DLw", "ALL"]; m2 = ["L", "U", "R", "DRw", "DLw", "ALL"]
-        f = lambda: f"{random.randint(0, 6)}{random.choice(['+', '-'])}"
-        return f"{' '.join([m+f() for m in m1])} y2 {' '.join([m+f() for m in m2])}"
+            m1 = ["UR", "DR", "DL", "UL", "UM", "L", "U", "R", "DRw", "DLw", "ALL"]
+            m2 = ["L", "U", "R", "DRw", "DLw", "ALL"]
+        
+        def get_move_str(m):
+            val = random.randint(0, 6)
+            sign = random.choice(['+', '-'])
+            # Logic: 0 and 6 can only be '+'
+            if val == 0 or val == 6:
+                sign = '+'
+            return f"{m}{val}{sign}"
+            
+        return f"{' '.join([get_move_str(m) for m in m1])} y2 {' '.join([get_move_str(m) for m in m2])}"
 
     def apply_logic(self, text):
         mode = self.mode_var.get()
@@ -182,8 +193,9 @@ class App(ctk.CTk):
             if not match: 
                 continue
             
-            cmd, val, sign = match.groups()
-            delta = int(val) if sign in ['+', '+'] else -int(val)
+            cmd, val_str, sign = match.groups()
+            val = int(val_str)
+            delta = val if sign == '+' else -val
             t, o = (self.back, self.front) if is_back else (self.front, self.back)
             
             if cmd in move_map:
@@ -203,10 +215,14 @@ class App(ctk.CTk):
         mode = self.mode_var.get()
         num_rounds = int(self.round_count_var.get())
         
-        if num_rounds == 1: round_names = ["Final"]
-        elif num_rounds == 2: round_names = ["First Round", "Final"]
-        elif num_rounds == 3: round_names = ["First Round", "Semi Final", "Final"]
-        else: round_names = ["First Round", "Second Round", "Semi Final", "Final"]
+        if num_rounds == 1: 
+            round_names = ["Final"]
+        elif num_rounds == 2: 
+            round_names = ["First Round", "Final"]
+        elif num_rounds == 3: 
+            round_names = ["First Round", "Semi Final", "Final"]
+        else: 
+            round_names = ["First Round", "Second Round", "Semi Final", "Final"]
 
         filename = f"{comp_name.replace(' ', '_')}_{mode}.pdf"
         doc = SimpleDocTemplate(filename, pagesize=A4)
@@ -216,7 +232,7 @@ class App(ctk.CTk):
         temp_files = []
 
         for r_name in round_names:
-            elements.append(Paragraph(f"{comp_name} - {r_name}", styles['Heading1']))
+            elements.append(Paragraph(f"{comp_name} - {r_name} ({mode})", styles['Heading1']))
             elements.append(Paragraph(f"Date Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
             elements.append(Spacer(1, 15))
             
@@ -246,6 +262,11 @@ class App(ctk.CTk):
                 elements.append(t)
                 elements.append(Spacer(1, 10))
             
+            # Signature block for competition
+            elements.append(Spacer(1, 20))
+            sig_table = Table([[Paragraph("Scrambler: ____________________", styles['Normal']), 
+                                Paragraph("Delegate: ____________________", styles['Normal'])]], colWidths=[250, 250])
+            elements.append(sig_table)
             elements.append(PageBreak())
 
         doc.build(elements)
