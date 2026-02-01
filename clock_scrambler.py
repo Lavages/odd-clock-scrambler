@@ -43,25 +43,42 @@ class ClockPuzzle(tk.Canvas):
     def draw_pointer(self, cx, cy, radius, value):
         angle_rad = math.radians(value * 30 - 90)
         ptr_color = self.ptr_color
-        tip_x, tip_y = cx + (radius - 12) * math.cos(angle_rad), cy + (radius - 12) * math.sin(angle_rad)
-        base_w, angle_deg = 10, value * 30 - 90
-        l_x, l_y = cx + base_w * math.cos(math.radians(angle_deg - 90)), cy + base_w * math.sin(math.radians(angle_deg - 90))
-        r_x, r_y = cx + base_w * math.cos(math.radians(angle_deg + 90)), cy + base_w * math.sin(math.radians(angle_deg + 90))
-        self.create_polygon(l_x, l_y, tip_x, tip_y, r_x, r_y, fill=ptr_color, outline="#2d3436", width=1, smooth=True)
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill="#ffffff", outline="#2d3436", width=1)
+        
+        # Max Length: Reaches significantly into the outer marker ring (radius + 8)
+        tip_x = cx + (radius + 8) * math.cos(angle_rad)
+        tip_y = cy + (radius + 8) * math.sin(angle_rad)
+        
+        # Width Locked: Kept at a solid thickness without getting wider
+        base_w = 14 
+        angle_deg = value * 30 - 90
+        
+        # We use a tighter angle for the base points to keep it from looking "fat"
+        l_x = cx + base_w * math.cos(math.radians(angle_deg - 100))
+        l_y = cy + base_w * math.sin(math.radians(angle_deg - 100))
+        r_x = cx + base_w * math.cos(math.radians(angle_deg + 100))
+        r_y = cy + base_w * math.sin(math.radians(angle_deg + 100))
+        
+        # Render the long, sleek pointer
+        self.create_polygon(l_x, l_y, tip_x, tip_y, r_x, r_y, 
+                            fill=ptr_color, outline="#2d3436", width=2, smooth=True)
+        
+        # Anchor point
+        self.create_oval(cx-6, cy-6, cx+6, cy+6, fill="#ffffff", outline="#2d3436", width=2)
 
     def render_puzzle(self):
         self.delete("all")
         mode = self.app.mode_var.get()
         if mode == "Triangular":
             main_r, lobe_r, lobe_pos = 230, 80, [(0, -185), (-190, 135), (190, 135)]
-            pin_positions = [(0, -42), (-36.37, 21), (36.37, 21)]
+            # Pins centered in the triangular gap
+            pin_positions = [(0, -85), (-95, 80), (95, 80)]
             clock_pos = [(0, -185), (-110, -35), (110, -35), (-190, 135), (0, 135), (190, 135)]
             clock_r, marker_r = 52, 60
         else:
             lobe_dist, lobe_r, main_r = 195, 60, 225
             lobe_pos = [(lobe_dist * math.cos(math.radians(i * 72 - 90)), lobe_dist * math.sin(math.radians(i * 72 - 90))) for i in range(5)]
-            pin_positions = [(65 * math.cos(math.radians(i * 72 - 18)), 65 * math.sin(math.radians(i * 72 - 18))) for i in range(5)]
+            # Pins pulled IN (from 125 to 105) to sit between corner clock and two edge clocks
+            pin_positions = [(105 * math.cos(math.radians(i * 72 - 18)), 105 * math.sin(math.radians(i * 72 - 18))) for i in range(5)]
             clock_pos = []
             for i in range(5): 
                 a = math.radians(i * 72 - 90)
@@ -89,7 +106,7 @@ class ClockPuzzle(tk.Canvas):
         for px, py in pin_positions:
             pcx, pcy = self.center + px, self.center + py
             out_c = "#2d3436" if self.is_front else "#ffffff"
-            self.create_oval(pcx-18, pcy-18, pcx+18, pcy+18, fill=self.pin_color, outline=out_c, width=2)
+            self.create_oval(pcx-14, pcy-14, pcx+14, pcy+14, fill=self.pin_color, outline=out_c, width=2)
 
         for i, (dx, dy) in enumerate(clock_pos):
             cx, cy = self.center + dx, self.center + dy
@@ -120,7 +137,7 @@ class App(ctk.CTk):
         self.back = ClockPuzzle(self.container, self, is_front=False)
         self.back.grid(row=0, column=1, padx=30)
 
-        self.status_label = ctk.CTkLabel(self, text=f"Generated on {datetime.now().strftime('%B %d, %Y')}", text_color="#f78fb3", font=("Arial", 16, "bold"))
+        self.status_label = ctk.CTkLabel(self, text=f"Odd Clock Scrambler v2.2", text_color="#f78fb3", font=("Arial", 16, "bold"))
         self.status_label.pack(pady=5)
 
         ctrl = ctk.CTkFrame(self, fg_color="#fdf2f5", corner_radius=20)
@@ -149,29 +166,23 @@ class App(ctk.CTk):
         self.back.render_puzzle()
 
     def generate_scramble_set(self):
-        # 5 regular + 2 extra (E1, E2)
         return [self.generate_single_scramble() for _ in range(7)]
 
     def generate_single_scramble(self):
         if self.mode_var.get() == "Triangular":
-            m1 = ["DR", "DL", "U", "R", "D", "L", "ALL"]
-            m2 = ["DR", "DL", "U", "ALL"]
+            m1 = ["DR", "DL", "U", "R", "D", "L", "ALL"]; m2 = ["DR", "DL", "U", "ALL"]
         else:
-            m1 = ["UR", "DR", "DL", "UL", "UM", "L", "U", "R", "DRw", "DLw", "ALL"]
-            m2 = ["L", "U", "R", "DRw", "DLw", "ALL"]
+            m1 = ["UR", "DR", "DL", "UL", "UM", "L", "U", "R", "DRw", "DLw", "ALL"]; m2 = ["L", "U", "R", "DRw", "DLw", "ALL"]
         
         def get_move_str(m):
             val = random.randint(0, 6)
-            sign = random.choice(['+', '-'])
-            # Logic: 0 and 6 can only be '+'
-            if val == 0 or val == 6:
-                sign = '+'
+            sign = '+' if val in [0, 6] else random.choice(['+', '-'])
             return f"{m}{val}{sign}"
             
         return f"{' '.join([get_move_str(m) for m in m1])} y2 {' '.join([get_move_str(m) for m in m2])}"
 
     def apply_logic(self, text):
-        mode = self.mode_var.get()
+        mode = self.app.mode_var.get()
         count = 6 if mode == "Triangular" else 10
         self.front.clock_values, self.back.clock_values = [12]*count, [12]*count
         is_back = False
@@ -188,95 +199,57 @@ class App(ctk.CTk):
             if move.lower() == 'y2': 
                 is_back = True
                 continue
-            
             match = re.match(r"([A-Za-z]+)(\d+)([+\-−])", move)
-            if not match: 
-                continue
-            
+            if not match: continue
             cmd, val_str, sign = match.groups()
-            val = int(val_str)
-            delta = val if sign == '+' else -val
+            delta = int(val_str) if sign == '+' else -int(val_str)
             t, o = (self.back, self.front) if is_back else (self.front, self.back)
-            
             if cmd in move_map:
                 for target in move_map[cmd]:
                     idx = idx_map[target]
                     t.clock_values[idx] = (t.clock_values[idx] + delta - 1) % 12 + 1
                     if not is_back:
-                        if idx in mirror:
-                            o.clock_values[mirror[idx]] = (o.clock_values[mirror[idx]] - delta - 1) % 12 + 1
+                        if idx in mirror: o.clock_values[mirror[idx]] = (o.clock_values[mirror[idx]] - delta - 1) % 12 + 1
                     else:
                         inv = {v: k for k, v in mirror.items()}
-                        if idx in inv:
-                            o.clock_values[inv[idx]] = (o.clock_values[inv[idx]] - delta - 1) % 12 + 1
+                        if idx in inv: o.clock_values[inv[idx]] = (o.clock_values[inv[idx]] - delta - 1) % 12 + 1
 
     def export_pdf(self):
         comp_name = self.comp_entry.get() or "Odd Clock Competition"
         mode = self.mode_var.get()
         num_rounds = int(self.round_count_var.get())
+        round_names = ["Final"] if num_rounds == 1 else ["First Round", "Final"] if num_rounds == 2 else ["First Round", "Semi Final", "Final"] if num_rounds == 3 else ["First Round", "Second Round", "Semi Final", "Final"]
         
-        if num_rounds == 1: 
-            round_names = ["Final"]
-        elif num_rounds == 2: 
-            round_names = ["First Round", "Final"]
-        elif num_rounds == 3: 
-            round_names = ["First Round", "Semi Final", "Final"]
-        else: 
-            round_names = ["First Round", "Second Round", "Semi Final", "Final"]
-
         filename = f"{comp_name.replace(' ', '_')}_{mode}.pdf"
         doc = SimpleDocTemplate(filename, pagesize=A4)
         styles = getSampleStyleSheet()
         text_style = ParagraphStyle('ScrStyle', fontSize=8, leading=10)
         elements = []
         temp_files = []
-
+        
         for r_name in round_names:
             elements.append(Paragraph(f"{comp_name} - {r_name} ({mode})", styles['Heading1']))
-            elements.append(Paragraph(f"Date Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+            elements.append(Paragraph(f"Date: {datetime.now().strftime('%B %d, %Y')}", styles['Normal']))
             elements.append(Spacer(1, 15))
-            
             scrambles = self.generate_scramble_set()
             for i, scr in enumerate(scrambles):
                 label = f"{i+1}" if i < 5 else f"E{i-4}"
-                self.apply_logic(scr)
-                self.front.render_puzzle()
-                self.back.render_puzzle()
-                self.update()
-                
+                self.apply_logic(scr); self.front.render_puzzle(); self.back.render_puzzle(); self.update()
                 img_path = f"tmp_{r_name.replace(' ', '')}_{i}.png"
                 x, y, w, h = self.container.winfo_rootx(), self.container.winfo_rooty(), self.container.winfo_width(), self.container.winfo_height()
-                ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(img_path)
-                temp_files.append(img_path)
-                
-                data = [[
-                    Paragraph(f"<b>{label}</b>", styles['Normal']), 
-                    Paragraph(scr.replace(" y2 ", "<br/>y2<br/>"), text_style), 
-                    RLImage(img_path, width=280, height=130)
-                ]]
+                ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(img_path); temp_files.append(img_path)
+                data = [[Paragraph(f"<b>{label}</b>", styles['Normal']), Paragraph(scr.replace(" y2 ", "<br/>y2<br/>"), text_style), RLImage(img_path, width=280, height=130)]]
                 t = Table(data, colWidths=[30, 160, 310])
-                t.setStyle(TableStyle([
-                    ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
-                ]))
-                elements.append(t)
-                elements.append(Spacer(1, 10))
-            
-            # Signature block for competition
-            elements.append(Spacer(1, 20))
-            sig_table = Table([[Paragraph("Scrambler: ____________________", styles['Normal']), 
-                                Paragraph("Delegate: ____________________", styles['Normal'])]], colWidths=[250, 250])
-            elements.append(sig_table)
+                t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey),('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+                elements.append(t); elements.append(Spacer(1, 8))
+            elements.append(Spacer(1, 15))
+            elements.append(Table([[Paragraph("Scrambler: ____________________", styles['Normal']), Paragraph("Delegate: ____________________", styles['Normal'])]], colWidths=[250, 250]))
             elements.append(PageBreak())
-
-        doc.build(elements)
         
+        doc.build(elements)
         for f in temp_files:
-            try:
-                os.remove(f)
-            except:
-                pass
-                
+            try: os.remove(f)
+            except: pass
         self.status_label.configure(text=f"PDF Generated: {filename}")
 
 if __name__ == "__main__":
