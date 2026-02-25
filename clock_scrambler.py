@@ -26,8 +26,14 @@ class CuboidPuzzle(tk.Canvas):
 
     def reset_state(self):
         cols = {'U': 'white', 'D': 'yellow', 'L': '#FF8C00', 'R': '#FF0000', 'F': '#00FF00', 'B': '#0000FF'}
+        # Specific colors for Pyraminx Duo
+        duo_cols = {"G": "#39FF14", "Y": "#FFFF00", "P": "#FF1493", "B": "#00BFFF"}
+        
         self.state = {}
-        if "Ivy" in self.mode:
+        if self.mode == "Pyraminx Duo":
+            for c in "GYPB":
+                for i in range(4): self.state[f"{c}{i}"] = duo_cols[c]
+        elif "Ivy" in self.mode:
             for f in 'UDLRFB':
                 for i in ['1','2','3']: self.state[f+i] = cols[f]
         elif "3x3x2" in self.mode or "3x3x1" in self.mode:
@@ -63,7 +69,20 @@ class CuboidPuzzle(tk.Canvas):
 
         for m in moves:
             inv = "'" in m
-            if "Ivy" in self.mode:
+            if self.mode == "Pyraminx Duo":
+                if 'U' in m:
+                    cycle(["G0", "B0", "P0"], inv)
+                    cycle(["G1", "B3", "P2"], inv)
+                elif 'R' in m:
+                    cycle(["G0", "P0", "Y0"], inv)
+                    cycle(["G3", "P1", "Y3"], inv)
+                elif 'L' in m:
+                    cycle(["G0", "Y0", "B0"], inv)
+                    cycle(["G2", "Y2", "B1"], inv)
+                elif 'B' in m:
+                    cycle(["B0", "Y0", "P0"], inv)
+                    cycle(["B2", "Y1", "P3"], inv)
+            elif "Ivy" in self.mode:
                 if 'L' in m:
                     cycle(['L2', 'U2', 'F2'], inv)
                     cycle(['L3', 'U1', 'F1'], inv)
@@ -177,8 +196,44 @@ class CuboidPuzzle(tk.Canvas):
                 leaf_pts.append((x + s + s * math.cos(a), y + s * math.sin(a)))
         self.create_polygon(leaf_pts, fill=self.state[f+'2'], outline="black", width=2, smooth=True)
 
+    def draw_duo_face(self, cx, cy, prefix, side=120, inv_orient=False):
+        h = (side * math.sqrt(3)) / 2
+        d_base = h / 3
+        inner_s = side * 0.35
+        inner_h = (inner_s * math.sqrt(3)) / 2
+        inner_d = inner_h / 3
+
+        if not inv_orient:
+            v = [(cx, cy - 2*d_base), (cx - side/2, cy + d_base), (cx + side/2, cy + d_base)]
+        else:
+            v = [(cx, cy + 2*d_base), (cx - side/2, cy - d_base), (cx + side/2, cy - d_base)]
+
+        m = [((v[0][0]+v[1][0])/2, (v[0][1]+v[1][1])/2),
+             ((v[1][0]+v[2][0])/2, (v[1][1]+v[2][1])/2),
+             ((v[2][0]+v[0][0])/2, (v[2][1]+v[0][1])/2)]
+
+        self.create_polygon(v[0], m[0], (cx, cy), m[2], fill=self.state[f"{prefix}1"], outline="black", width=2)
+        self.create_polygon(v[1], m[1], (cx, cy), m[0], fill=self.state[f"{prefix}2"], outline="black", width=2)
+        self.create_polygon(v[2], m[2], (cx, cy), m[1], fill=self.state[f"{prefix}3"], outline="black", width=2)
+
+        iv = [(cx, cy-2*inner_d), (cx-inner_s/2, cy+inner_d), (cx+inner_s/2, cy+inner_d)] if not inv_orient else \
+             [(cx, cy+2*inner_d), (cx-inner_s/2, cy-inner_d), (cx+inner_s/2, cy-inner_d)]
+        self.create_polygon(iv, fill=self.state[f"{prefix}0"], outline="black", width=2)
+
     def render_puzzle(self):
         self.delete("all")
+        if self.mode == "Pyraminx Duo":
+            side = 130
+            h = (side * math.sqrt(3)) / 2
+            gap = (h * 2/3) + 12
+            self.draw_duo_face(550, 180, "G", side)
+            self.draw_duo_face(550, 180 + gap, "Y", side, True)
+            px, py = 550 + gap * math.cos(math.radians(30)), 180 - gap * math.sin(math.radians(30))
+            self.draw_duo_face(px, py, "P", side, True)
+            bx, by = 550 - gap * math.cos(math.radians(30)), 180 - gap * math.sin(math.radians(30))
+            self.draw_duo_face(bx, by, "B", side, True)
+            return
+
         if "Ivy" in self.mode:
             s, g = 100, 12
             start_x, start_y = 250, 40
@@ -254,7 +309,7 @@ class ClockPuzzle(tk.Canvas):
     def render_puzzle(self):
         self.delete("all")
         mode = self.app.mode_var.get()
-        if "Cuboid" in mode or "Ivy" in mode: return
+        if "Cuboid" in mode or "Ivy" in mode or "Pyraminx" in mode: return
         lobe_pos, pin_positions, clock_pos = [], [], []
         clock_r, marker_r = 40, 48
         if mode == "Triangular":
@@ -339,7 +394,7 @@ class App(ctk.CTk):
         self.round_spin.pack(side="left", padx=5)
         self.round_spin.insert(0, "1")
 
-        modes = ["Triangular", "Pentagonal", "Super-Pentagonal", "1x2x3 Cuboid", "2x2x3 Cuboid", "3x3x2 Cuboid", "3x3x1 Cuboid", "Ivy Cube"]
+        modes = ["Triangular", "Pentagonal", "Super-Pentagonal", "1x2x3 Cuboid", "2x2x3 Cuboid", "3x3x2 Cuboid", "3x3x1 Cuboid", "Ivy Cube", "Pyraminx Duo"]
         self.mode_menu = ctk.CTkOptionMenu(inner_ctrl, values=modes, variable=self.mode_var, command=self.change_mode, fg_color="#f78fb3")
         self.mode_menu.pack(side="left", padx=10)
         
@@ -349,7 +404,7 @@ class App(ctk.CTk):
         self.change_mode(self.mode_var.get())
 
     def change_mode(self, mode):
-        if "Cuboid" in mode or "Ivy" in mode:
+        if "Cuboid" in mode or "Ivy" in mode or "Pyraminx" in mode:
             self.clock_frame.pack_forget(); self.cuboid.pack(expand=True)
             self.cuboid.mode = mode; self.cuboid.reset_state(); self.cuboid.render_puzzle()
         else:
@@ -390,45 +445,37 @@ class App(ctk.CTk):
                         if not is_back:
                             if idx in mirror_indices:
                                 b_idx = mirror_indices[idx]; o.clock_values[b_idx] = (o.clock_values[b_idx] - delta - 1) % 12 + 1
-                        else:
-                            inv_mirror = {v: k for k, v in mirror_indices.items()}
-                            if idx in inv_mirror:
-                                f_idx = inv_mirror[idx]; o.clock_values[f_idx] = (o.clock_values[f_idx] - delta - 1) % 12 + 1
+            else:
+                inv_mirror = {v: k for k, v in mirror_indices.items()}
+                if idx in inv_mirror:
+                    f_idx = inv_mirror[idx]; o.clock_values[f_idx] = (o.clock_values[f_idx] - delta - 1) % 12 + 1
 
     def generate_single_scramble(self):
         mode = self.mode_var.get()
         
-        # --- CUBOID & IVY MODES ---
-        if "Cuboid" in mode or "Ivy" in mode:
+        if "Cuboid" in mode or "Ivy" in mode or "Pyraminx" in mode:
             self.cuboid.mode = mode
             self.cuboid.reset_state()
             solved_state = self.cuboid.state.copy()
             
-            # 1. 3x3x2 Cuboid (Domino) - 25 moves, L2 allowed, No D, No sandwich opposites
-            if mode == "3x3x2 Cuboid":
+            if mode == "Pyraminx Duo":
+                moves = ["U", "U'", "L", "L'", "R", "R'", "B", "B'"]
+                length = random.randint(6, 7)
+            elif mode == "3x3x2 Cuboid":
                 moves = ["U", "U'", "U2", "R2", "L2", "F2", "B2"]
                 length = 25
-            
-            # 2. 3x3x1 Cuboid (Floppy) - L allowed, single letter notation
             elif mode == "3x3x1 Cuboid":
                 moves = ["R", "L", "F", "B"]
                 length = random.randint(4, 8)
-                
-            # 3. 2x2x3 Cuboid (Tower) - No L/B moves, U/D/R2/F2 pool
             elif mode == "2x2x3 Cuboid":
                 moves = ["U", "U'", "U2", "D", "D'", "D2", "R2", "F2"]
                 length = random.randint(10, 13)
-
-            # 4. 1x2x3 Cuboid - No F, No L, only 180 deg (U2, D2, R2)
             elif mode == "1x2x3 Cuboid":
                 moves = ["U2", "D2", "R2"]
                 length = random.randint(8, 10)
-                
-            # 5. Ivy Cube - L allowed, corner rotation notation
             elif mode == "Ivy Cube":
                 moves = ["R", "R'", "L", "L'", "U", "U'", "B", "B'"]
                 length = random.randint(7, 10)
-                
             else:
                 moves, length = ["U2", "D2", "R2"], 10
 
@@ -436,43 +483,27 @@ class App(ctk.CTk):
                 scr = []
                 while len(scr) < length:
                     m = random.choice(moves)
-                    
-                    # Rule 1: Don't move the same face twice consecutively
-                    if scr and m[0] == scr[-1][0]:
-                        continue
-                        
-                    # Rule 2: No U D U or D U D patterns
+                    if scr and m[0] == scr[-1][0]: continue
                     if len(scr) >= 2:
                         pattern = [scr[-2][0], scr[-1][0], m[0]]
-                        if pattern == ['U', 'D', 'U'] or pattern == ['D', 'U', 'D']:
-                            continue
-                    
-                    # Rule 3: No R L R, L R L, F B F, or B F B sandwich patterns (3x3x2)
+                        if pattern == ['U', 'D', 'U'] or pattern == ['D', 'U', 'D']: continue
                     if mode == "3x3x2 Cuboid" and len(scr) >= 2:
-                        pair = {scr[-2][0], m[0]}
-                        # If first and third moves are the same face, and middle is the opposite
                         if scr[-2][0] == m[0]:
-                            if pair == {'R', 'L'} or pair == {'F', 'B'}:
-                                continue
-                    
+                            pair = {scr[-2][0], m[0]}
+                            if pair == {'R', 'L'} or pair == {'F', 'B'}: continue
                     scr.append(m)
                 
                 scr_str = " ".join(scr)
-                
-                # Verify non-triviality
                 self.cuboid.reset_state()
                 self.cuboid.apply_move(scr_str)
-                if self.cuboid.state != solved_state:
-                    return scr_str
+                if self.cuboid.state != solved_state: return scr_str
 
-        # --- CLOCK LOGIC (UNTOUCHED) ---
         elif mode == "Triangular":
             m1, m2 = ["DR", "DL", "U", "R", "D", "L", "ALL"], ["DR", "DL", "U", "ALL"]
             def get_m(m):
                 v = random.randint(0, 6); s = '+' if v in [0,6] else random.choice(['+','-'])
                 return f"{m}{v}{s}"
             return f"{' '.join([get_m(m) for m in m1])} y2 {' '.join([get_m(m) for m in m2])}"
-        
         else:
             m1, m2 = ["UR", "DR", "DL", "UL", "UM", "L", "U", "R", "DRw", "DLw", "ALL"], ["L", "U", "R", "DRw", "DLw", "ALL"]
             def get_m(m):
@@ -495,13 +526,11 @@ class App(ctk.CTk):
         
         elements = []
         temp_files = []
-        is_clock = "Cuboid" not in mode and "Ivy" not in mode
+        is_clock = "Cuboid" not in mode and "Ivy" not in mode and "Pyraminx" not in mode
         
-        # Scaling for PDF
         img_w, img_h = (4.5*inch, 2.2*inch) if is_clock else (4.0*inch, 2.3*inch)
 
         for r_num in range(1, num_rounds + 1):
-            # Page Title Section
             title_table = Table([
                 [Paragraph(f"<b>{comp_date}</b>", header_style), ""],
                 [Paragraph(f"<b>{comp_name}</b>", header_style), ""],
@@ -510,12 +539,10 @@ class App(ctk.CTk):
             elements.append(title_table)
             elements.append(Spacer(1, 15))
 
-            # Scramble loop (1-5 + E1, E2)
             for i in range(1, 8):
                 is_extra = (i > 5)
                 label = f"{i}" if not is_extra else f"E{i-5}"
-                
-                if i == 6: # Divider for Extras
+                if i == 6:
                     elements.append(Spacer(1, 10))
                     elements.append(Paragraph("<b>Extra Scrambles</b>", header_style))
                     elements.append(Spacer(1, 5))
@@ -537,7 +564,6 @@ class App(ctk.CTk):
                 ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(img_path)
                 temp_files.append(img_path)
 
-                # Table Row
                 row_content = [
                     Paragraph(f"<b>{label}</b>", header_style),
                     Paragraph(scr.replace(" y2 ", "<br/>y2<br/>"), scramble_style),
